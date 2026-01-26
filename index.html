@@ -1,53 +1,180 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title>Global 3D Terrain Map</title>
+    <title>Wildfire Intelligence Platform</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/maplibre-gl@5.8.0/dist/maplibre-gl.css"
-    />
+    <link href="https://unpkg.com/maplibre-gl@5.8.0/dist/maplibre-gl.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <script src="https://unpkg.com/maplibre-gl@5.8.0/dist/maplibre-gl.js"></script>
-
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <button id="sidebar-toggle" onclick="toggleSidebar()">☰</button>
-    
-    <div id="sidebar">
-      <div class="sidebar-header">
-        <h2>Side bar</h2>
+    <div id="sidebar" class="open"> <div class="sidebar-header">
+        <h2><span class="material-icons-round">local_fire_department</span> Command Center</h2>
       </div>
+      
       <div class="sidebar-content">
-        <!-- Add your content here -->
+        <div class="layer-group">
+          <div class="group-title">
+             <span class="material-icons-round">satellite_alt</span> Satellite Feeds
+          </div>
+          
+          <label class="layer-item">
+            <input type="checkbox" id="sat-arcgis" checked onchange="toggleSatellite('arcgis')">
+            <span>ArcGIS World Imagery</span>
+          </label>
+          
+          <label class="layer-item">
+            <input type="checkbox" id="sat-sentinel" onchange="toggleSatellite('sentinel')">
+            <span>ESA Sentinel-2</span>
+          </label>
+        </div>
+
+        <div class="layer-group">
+          <div class="group-title">
+             <span class="material-icons-round">air</span> Atmospheric
+          </div>
+          
+          <label class="layer-item">
+            <input type="checkbox" id="layer-wind" onchange="toggleLayer('wind-layer')">
+            <span>Wind Speed</span>
+          </label>
+          
+          <label class="layer-item">
+            <input type="checkbox" id="layer-temp" onchange="toggleLayer('temp-layer')">
+            <span>Global Temperature</span>
+          </label>
+        </div>
+
+        <div class="layer-group">
+          <div class="group-title">
+             <span class="material-icons-round">science</span> Gas Analysis (S-5P)
+          </div>
+          
+          <label class="layer-item">
+            <input type="checkbox" id="layer-no2" onchange="toggleGas('no2-layer')">
+            <span>Nitrogen Dioxide (NO₂)</span>
+          </label>
+          
+          <label class="layer-item">
+            <input type="checkbox" id="layer-co" onchange="toggleGas('co-layer')">
+            <span>Carbon Monoxide (CO)</span>
+          </label>
+          
+           <label class="layer-item">
+            <input type="checkbox" id="layer-so2" onchange="toggleGas('so2-layer')">
+            <span>Sulfur Dioxide (SO₂)</span>
+          </label>
+        </div>
+
+        <div id="dynamic-legend" class="legend-box" style="display:none;"></div>
+
       </div>
     </div>
-    
-    <div id="map"></div>
-    <div id="coords"></div>
 
-    <script src="./globe.js"></script>
+    <button id="sidebar-toggle" onclick="toggleSidebar()" class="open" aria-label="Close sidebar">
+      <span id="sidebar-toggle-icon" class="material-icons-round">menu_open</span>
+    </button>
+    
+    <div id="map" class="sidebar-open"></div>
+    <div id="coords" class="sidebar-open"></div>
+
+    <script src="./scripts/bootstrap.js"></script>
+    
     <script>
       function toggleSidebar() {
-        var sidebar = document.getElementById("sidebar");
-        var toggle = document.getElementById("sidebar-toggle");
-        var mapEl = document.getElementById("map");
-        var coords = document.getElementById("coords");
-        
+        const sidebar = document.getElementById("sidebar");
+        const mapEl = document.getElementById("map");
+        const coords = document.getElementById("coords");
+        const toggle = document.getElementById("sidebar-toggle");
+        const icon = document.getElementById("sidebar-toggle-icon");
+
         sidebar.classList.toggle("open");
-        toggle.classList.toggle("open");
         mapEl.classList.toggle("sidebar-open");
-        if (coords) coords.classList.toggle("sidebar-open");
+        coords.classList.toggle("sidebar-open");
+        toggle.classList.toggle("open");
+
+        const isOpen = sidebar.classList.contains("open");
+        icon.textContent = isOpen ? "menu_open" : "menu";
+        toggle.setAttribute("aria-label", isOpen ? "Close sidebar" : "Open sidebar");
+
+        setTimeout(() => map.resize(), 300);
+      }
+
+      // Satellite Mutex Logic
+      function toggleSatellite(selected) {
+        const arcgis = document.getElementById('sat-arcgis');
+        const sentinel = document.getElementById('sat-sentinel');
         
-        toggle.innerHTML = sidebar.classList.contains("open") ? "✕" : "☰";
-        
-        setTimeout(function() {
-          if (typeof map !== "undefined") map.resize();
-        }, 300);
+        if (selected === 'arcgis') {
+          if (arcgis.checked) {
+             sentinel.checked = false;
+           if (map.getLayer('satellite')) map.setLayoutProperty('satellite', 'visibility', 'visible');
+           if (map.getLayer('sentinel-2')) map.setLayoutProperty('sentinel-2', 'visibility', 'none');
+          } else {
+             // Prevent unchecking both (fallback to base)
+             arcgis.checked = true;
+          }
+        } else {
+          if (sentinel.checked) {
+             arcgis.checked = false;
+           if (map.getLayer('sentinel-2')) map.setLayoutProperty('sentinel-2', 'visibility', 'visible');
+           if (map.getLayer('satellite')) map.setLayoutProperty('satellite', 'visibility', 'none');
+          } else {
+             arcgis.checked = true;
+           if (map.getLayer('satellite')) map.setLayoutProperty('satellite', 'visibility', 'visible');
+           if (map.getLayer('sentinel-2')) map.setLayoutProperty('sentinel-2', 'visibility', 'none');
+          }
+        }
+      }
+
+      // Generic Layer Toggle
+      function toggleLayer(mapLayerId) {
+        const domId = 'layer-' + mapLayerId.replace('-layer', '');
+        const checkbox = document.getElementById(domId);
+        if (!checkbox || !map.getLayer(mapLayerId)) return;
+
+        // Atmospheric layers should be mutually exclusive
+        if (mapLayerId === 'wind-layer' || mapLayerId === 'temp-layer') {
+          const otherId = mapLayerId === 'wind-layer' ? 'temp-layer' : 'wind-layer';
+          const otherCheckbox = document.getElementById('layer-' + otherId.replace('-layer', ''));
+          if (otherCheckbox) otherCheckbox.checked = false;
+          if (map.getLayer(otherId)) map.setLayoutProperty(otherId, 'visibility', 'none');
+        }
+
+        map.setLayoutProperty(mapLayerId, 'visibility', checkbox.checked ? 'visible' : 'none');
+        updateLegend(mapLayerId, checkbox.checked);
+      }
+
+      // Gas Toggle (Mutex Recommended for visibility)
+      function toggleGas(selectedId) {
+        const ids = ['no2-layer', 'co-layer', 'so2-layer'];
+        ids.forEach(id => {
+          if (map.getLayer(id)) {
+            map.setLayoutProperty(id, 'visibility', 'none');
+          }
+          const checkbox = document.getElementById('layer-' + id.replace('-layer', ''));
+          if (checkbox && id !== selectedId) checkbox.checked = false;
+        });
+
+        const selectedCheckbox = document.getElementById('layer-' + selectedId.replace('-layer', ''));
+        if (!selectedCheckbox || !map.getLayer(selectedId)) return;
+        map.setLayoutProperty(selectedId, 'visibility', selectedCheckbox.checked ? 'visible' : 'none');
+        updateLegend(selectedId, selectedCheckbox.checked);
+      }
+      
+      function updateLegend(layer, visible) {
+         const legend = document.getElementById('dynamic-legend');
+         if (!visible) { legend.style.display = 'none'; return; }
+         
+         legend.style.display = 'block';
+         if (layer.includes('wind')) legend.innerHTML = '<b>Wind Speed</b><br><span style="background:linear-gradient(90deg, blue, red); display:block; height:8px; width:100%"></span>Low &nbsp;&nbsp;&nbsp; High';
+         if (layer.includes('temp')) legend.innerHTML = '<b>Temperature</b><br><span style="background:linear-gradient(90deg, blue, yellow, red); display:block; height:8px; width:100%"></span>-40°C &nbsp;&nbsp; 40°C';
+         if (layer.includes('no2')) legend.innerHTML = '<b>NO₂ Concentration</b><br><span style="background:linear-gradient(90deg, white, orange, brown); display:block; height:8px; width:100%"></span>Low &nbsp;&nbsp; High';
+         if (layer.includes('co')) legend.innerHTML = '<b>CO Level</b><br><span style="background:linear-gradient(90deg, white, gray, black); display:block; height:8px; width:100%"></span>Low &nbsp;&nbsp; High';
+         if (layer.includes('so2')) legend.innerHTML = '<b>SO₂ Concentration</b><br><span style="background:linear-gradient(90deg, white, orange, red); display:block; height:8px; width:100%"></span>Low &nbsp;&nbsp; High';
       }
     </script>
-    <script src="./extensions.js"></script>
   </body>
 </html>
