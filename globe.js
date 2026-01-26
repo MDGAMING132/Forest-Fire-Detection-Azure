@@ -2,6 +2,7 @@ const map = new maplibregl.Map({
   container: "map",
   center: [75, 20],
   zoom: 2.0,
+  maxZoom: 22,
   pitch: 5,
   bearing: 0,
 
@@ -14,6 +15,7 @@ const map = new maplibregl.Map({
           "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
         ],
         tileSize: 256,
+        maxzoom: 17,
         attribution: "Esri, Maxar, Earthstar Geographics"
       },
 
@@ -34,6 +36,7 @@ const map = new maplibregl.Map({
           "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         ],
         tileSize: 256,
+        maxzoom: 18,
         attribution: "© OpenStreetMap contributors"
       },
 
@@ -45,6 +48,7 @@ const map = new maplibregl.Map({
             "https://c.tile.opentopomap.org/{z}/{x}/{y}.png"
         ],
         tileSize: 256,
+        maxzoom: 15,
         attribution: "© OpenTopoMap"
       }
     },
@@ -159,14 +163,13 @@ mapSelectorContainer.style.alignItems = "center";
 document.body.appendChild(mapSelectorContainer);
 
 const mapIcon = document.createElement("img");
-mapIcon.src = "https://cdn.iconscout.com/icon/free/png-256/free-map-icon-svg-download-png-1214129.png";
+mapIcon.src = "map icon.png";
 mapIcon.alt = "Map icon";
-mapIcon.style.width = "22px";
+mapIcon.style.width = "26px";
 mapIcon.style.height = "22px";
 mapIcon.style.objectFit = "cover";
 mapIcon.style.borderRadius = "4px";
 mapIcon.style.marginRight = "6px";
-mapIcon.style.boxShadow = "0 0 4px rgba(0, 0, 0, 0.3)";
 mapSelectorContainer.appendChild(mapIcon);
 
 const mapSelect = document.createElement("select");
