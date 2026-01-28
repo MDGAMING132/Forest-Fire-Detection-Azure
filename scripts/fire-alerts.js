@@ -99,7 +99,7 @@
                         <span class="material-icons-round" style="font-size:16px;">map</span>
                         View on Map
                     </button>
-                    ${alert.image ? `
+                    ${(alert.imageData || alert.image) ? `
                     <button onclick="viewAlertImage('${alert.id}')" style="
                         background: rgba(255,255,255,0.2);
                         border: 1px solid rgba(255,255,255,0.4);
@@ -157,7 +157,10 @@
             const lat = alert.location?.latitude || alert.location?.lat;
             const lon = alert.location?.longitude || alert.location?.lon;
             
-            if (!lat || !lon) return;
+            if (!lat || !lon) {
+                console.log('Skipping alert without location:', alert);
+                return;
+            }
 
             const isDrone = alert.source === 'aerial_camera' || alert.device?.includes('Drone');
 
@@ -208,7 +211,7 @@
                                 <div><strong>Coordinates:</strong> ${lat.toFixed(6)}, ${lon.toFixed(6)}</div>
                                 ${alert.location.altitude ? `<div><strong>Altitude:</strong> ${alert.location.altitude.toFixed(1)}m</div>` : ''}
                                 ${alert.device ? `<div><strong>Device:</strong> ${alert.device}</div>` : ''}
-                                ${alert.image ? `<img src="${alert.image}" style="width:100%; margin-top:8px; border-radius:4px;" onerror="this.style.display='none'" />` : ''}
+                                ${(alert.imageData || alert.image) ? `<img src="data:image/jpeg;base64,${alert.imageData || alert.image}" style="width:100%; margin-top:8px; border-radius:4px;" onerror="this.style.display='none'" />` : ''}
                             </div>
                         </div>
                     `))
@@ -221,20 +224,25 @@
     // View alert on map
     window.viewAlertOnMap = function(alertId) {
         const alert = alertsCache.find(a => a.id === alertId);
-        if (!alert || !alert.location || !alert.location.lat || !alert.location.lon) return;
+        const lat = alert?.location?.latitude || alert?.location?.lat;
+        const lon = alert?.location?.longitude || alert?.location?.lon;
+        if (!alert || !lat || !lon) {
+            console.error('Alert not found or missing location:', alertId);
+            return;
+        }
         
         if (typeof map !== 'undefined') {
             map.flyTo({
-                center: [alert.location.lon, alert.location.lat],
-                zoom: 12,
+                center: [lon, lat],
+                zoom: 14,
                 duration: 2000
             });
 
             // Find and open the marker popup
             const marker = markers.find(m => {
                 const lngLat = m.getLngLat();
-                return Math.abs(lngLat.lat - alert.location.lat) < 0.0001 && 
-                       Math.abs(lngLat.lng - alert.location.lon) < 0.0001;
+                return Math.abs(lngLat.lat - lat) < 0.0001 && 
+                       Math.abs(lngLat.lng - lon) < 0.0001;
             });
             
             if (marker) {
@@ -246,7 +254,11 @@
     // View alert image in modal
     window.viewAlertImage = function(alertId) {
         const alert = alertsCache.find(a => a.id === alertId);
-        if (!alert || !alert.image) return;
+        const imageData = alert?.imageData || alert?.image;
+        if (!alert || !imageData) {
+            console.error('Alert image not found:', alertId);
+            return;
+        }
 
         // Create modal if it doesn't exist
         let modal = document.getElementById('fire-alert-image-modal');
@@ -315,7 +327,7 @@
         const img = document.getElementById('modal-alert-image');
         const info = document.getElementById('modal-alert-info');
         
-        img.src = alert.image;
+        img.src = `data:image/jpeg;base64,${imageData}`;
         
         const locationText = alert.location ? 
             `${alert.location.city || ''}, ${alert.location.state || ''}, ${alert.location.country || ''}`.replace(/^,\s*|,\s*$/g, '').replace(/,\s*,/g, ',') :
@@ -345,8 +357,9 @@
         if (!window.currentAlertImage) return;
         
         const alert = window.currentAlertImage;
+        const imageData = alert.imageData || alert.image;
         const link = document.createElement('a');
-        link.href = alert.image;
+        link.href = `data:image/jpeg;base64,${imageData}`;
         link.download = `fire_alert_${alert.id}_${new Date(alert.timestamp).getTime()}.jpg`;
         document.body.appendChild(link);
         link.click();
