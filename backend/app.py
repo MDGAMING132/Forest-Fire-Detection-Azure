@@ -147,11 +147,28 @@ def clean_old_alerts():
     now = datetime.now()
     original_count = len(fire_alerts)
     
-    fire_alerts = [
-        alert for alert in fire_alerts
-        if (now - datetime.fromisoformat(alert['timestamp'])) < timedelta(minutes=ALERT_EXPIRY_MINUTES)
-    ]
+    # Filter alerts, handling potential parsing errors
+    filtered_alerts = []
+    for alert in fire_alerts:
+        try:
+            timestamp_str = alert.get('timestamp', '')
+            if timestamp_str:
+                # Handle ISO format with or without timezone
+                alert_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                # Remove timezone info for comparison
+                if alert_time.tzinfo is not None:
+                    alert_time = alert_time.replace(tzinfo=None)
+                
+                if (now - alert_time) < timedelta(minutes=ALERT_EXPIRY_MINUTES):
+                    filtered_alerts.append(alert)
+            else:
+                # Keep alerts without timestamp
+                filtered_alerts.append(alert)
+        except (ValueError, AttributeError) as e:
+            print(f"⚠️ Error parsing timestamp: {e}, keeping alert")
+            filtered_alerts.append(alert)
     
+    fire_alerts = filtered_alerts
     removed = original_count - len(fire_alerts)
     if removed > 0:
         print(f"🗑️ Auto-removed {removed} expired alerts (older than {ALERT_EXPIRY_MINUTES} minutes)")
@@ -159,35 +176,42 @@ def clean_old_alerts():
 @app.post("/api/fire-alert")
 def receive_fire_alert():
     """Receive fire detection from webcam AI"""
-    # Clean old alerts before adding new one
-    clean_old_alerts()
+    try:
+        # Clean old alerts before adding new one
+        clean_old_alerts()
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        alert = {
+            "id": str(len(fire_alerts) + 1),
+            "type": data.get("type"),
+            "confidence": data.get("confidence"),
+            "location": data.get("location"),
+            "timestamp": data.get("timestamp"),
+            "bbox": data.get("bbox"),
+            "imageData": data.get("image"),
+            "receivedAt": data.get("timestamp")
+        }
+        
+        # Add to beginning of list
+        fire_alerts.insert(0, alert)
+        
+        # Keep only last MAX_ALERTS
+        if len(fire_alerts) > MAX_ALERTS:
+            removed = fire_alerts[MAX_ALERTS:]
+            fire_alerts = fire_alerts[:MAX_ALERTS]
+            print(f"🗑️ Removed {len(removed)} old alerts (keeping last {MAX_ALERTS})")
+        
+        print(f"🔥 Fire alert received from {alert['location'].get('city', 'Unknown')}")
+        return jsonify({"success": True, "message": "Fire alert received", "alertId": alert["id"]})
     
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No data provided"}), 400
-    
-    alert = {
-        "id": str(len(fire_alerts) + 1),
-        "type": data.get("type"),
-        "confidence": data.get("confidence"),
-        "location": data.get("location"),
-        "timestamp": data.get("timestamp"),
-        "bbox": data.get("bbox"),
-        "imageData": data.get("image"),
-        "receivedAt": data.get("timestamp")
-    }
-    
-    # Add to beginning of list
-    fire_alerts.insert(0, alert)
-    
-    # Keep only last MAX_ALERTS
-    if len(fire_alerts) > MAX_ALERTS:
-        removed = fire_alerts[MAX_ALERTS:]
-        fire_alerts = fire_alerts[:MAX_ALERTS]
-        print(f"🗑️ Removed {len(removed)} old alerts (keeping last {MAX_ALERTS})")
-    
-    print(f"🔥 Fire alert received from {alert['location'].get('city', 'Unknown')}")
-    return jsonify({"success": True, "message": "Fire alert received", "alertId": alert["id"]})
+    except Exception as e:
+        print(f"❌ Error processing fire alert: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
 @app.get("/api/fire-alerts")
 def get_fire_alerts():
