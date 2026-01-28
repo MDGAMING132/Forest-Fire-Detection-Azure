@@ -14,6 +14,14 @@
                 return [];
             }
             const data = await response.json();
+            if (data.alerts && data.alerts.length > 0) {
+                console.log('📍 Fetched alerts with coordinates:', data.alerts.map(a => ({
+                    id: a.id,
+                    lat: a.location?.latitude || a.location?.lat,
+                    lon: a.location?.longitude || a.location?.lon,
+                    location: a.location
+                })));
+            }
             return data.alerts || [];
         } catch (error) {
             console.error('Error fetching fire alerts:', error);
