@@ -216,22 +216,51 @@
 
             const marker = new maplibregl.Marker({element: el})
                 .setLngLat([lon, lat])
-                .setPopup(new maplibregl.Popup({offset: 25})
-                    .setHTML(`
-                        <div style="padding:8px; background:white; color:#333;">
-                            <strong style="color:${isDrone ? '#ff6600' : '#ff4444'};">${isDrone ? '🚁' : '🔥'} ${isDrone ? 'Drone' : 'AI'} Fire Detection Alert</strong>
-                            <div style="margin-top:8px; font-size:13px; color:#333;">
-                                <div style="color:#333;"><strong>Time:</strong> ${new Date(alert.timestamp).toLocaleString()}</div>
-                                ${alert.confidence ? `<div style="color:#333;"><strong>Confidence:</strong> ${(alert.confidence * 100).toFixed(1)}%</div>` : ''}
-                                ${alert.location.city ? `<div style="color:#333;"><strong>Location:</strong> ${alert.location.city}${alert.location.state ? ', ' + alert.location.state : ''}</div>` : ''}
-                                <div style="color:#333;"><strong>Coordinates:</strong> ${lat.toFixed(6)}, ${lon.toFixed(6)}</div>
-                                ${alert.location.altitude ? `<div style="color:#333;"><strong>Altitude:</strong> ${alert.location.altitude.toFixed(1)}m</div>` : ''}
-                                ${alert.device ? `<div style="color:#333;"><strong>Device:</strong> ${alert.device}</div>` : ''}
-                                ${(alert.imageData || alert.image) ? `<img src="${(alert.imageData || alert.image).startsWith('data:') ? (alert.imageData || alert.image) : 'data:image/jpeg;base64,' + (alert.imageData || alert.image)}" style="width:100%; margin-top:8px; border-radius:4px;" onerror="this.style.display='none'" />` : ''}
-                            </div>
-                        </div>
-                    `))
                 .addTo(map);
+            
+            // Create popup content with place name fetch
+            const popup = new maplibregl.Popup({offset: 25});
+            
+            // Initial popup content
+            const initialContent = `
+                <div style="padding:8px; background:white; color:#333;">
+                    <strong style="color:${isDrone ? '#ff6600' : '#ff4444'};">${isDrone ? '🚁' : '🔥'} ${isDrone ? 'Drone' : 'AI'} Fire Detection Alert</strong>
+                    <div style="margin-top:8px; font-size:13px; color:#333;">
+                        <div style="color:#333;"><strong>Time:</strong> ${new Date(alert.timestamp).toLocaleString()}</div>
+                        ${alert.confidence ? `<div style="color:#333;"><strong>Confidence:</strong> ${(alert.confidence * 100).toFixed(1)}%</div>` : ''}
+                        <div style="color:#333;"><strong>Location:</strong> <span id="location-name-${alert.id}">Loading...</span></div>
+                        ${alert.location.altitude ? `<div style="color:#333;"><strong>Altitude:</strong> ${alert.location.altitude.toFixed(1)}m</div>` : ''}
+                        ${alert.device ? `<div style="color:#333;"><strong>Device:</strong> ${alert.device}</div>` : ''}
+                        ${(alert.imageData || alert.image) ? `<img src="${(alert.imageData || alert.image).startsWith('data:') ? (alert.imageData || alert.image) : 'data:image/jpeg;base64,' + (alert.imageData || alert.image)}" style="width:100%; margin-top:8px; border-radius:4px;" onerror="this.style.display='none'" />` : ''}
+                    </div>
+                </div>
+            `;
+            
+            popup.setHTML(initialContent);
+            marker.setPopup(popup);
+            
+            // Fetch place name using reverse geocoding
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=14&addressdetails=1`)
+                .then(response => response.json())
+                .then(data => {
+                    const address = data.address || {};
+                    const placeName = address.city || address.town || address.village || 
+                                     address.county || address.state || 
+                                     address.country || `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+                    
+                    // Update the location name in the popup
+                    const locationSpan = document.getElementById(`location-name-${alert.id}`);
+                    if (locationSpan) {
+                        locationSpan.textContent = placeName;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching place name:', error);
+                    const locationSpan = document.getElementById(`location-name-${alert.id}`);
+                    if (locationSpan) {
+                        locationSpan.textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+                    }
+                });
 
             markers.push(marker);
         });
