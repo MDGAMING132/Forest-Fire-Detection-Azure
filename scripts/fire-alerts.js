@@ -240,30 +240,41 @@
     // View alert on map
     window.viewAlertOnMap = function(alertId) {
         const alert = alertsCache.find(a => a.id === alertId);
-        const lat = alert?.location?.latitude || alert?.location?.lat;
-        const lon = alert?.location?.longitude || alert?.location?.lon;
-        if (!alert || !lat || !lon) {
-            console.error('Alert not found or missing location:', alertId);
+        if (!alert || !alert.location) {
+            console.error('Alert not found or missing location:', alertId, alert);
+            return;
+        }
+        
+        const lat = alert.location.latitude || alert.location.lat;
+        const lon = alert.location.longitude || alert.location.lon;
+        
+        console.log('Navigating to alert:', alertId, 'Coordinates:', lat, lon, 'Full alert:', alert);
+        
+        if (!lat || !lon) {
+            console.error('Alert missing coordinates:', alertId, alert.location);
+            alert('Location coordinates not available for this alert.');
             return;
         }
         
         if (typeof map !== 'undefined') {
             map.flyTo({
                 center: [lon, lat],
-                zoom: 14,
+                zoom: 15,
                 duration: 2000
             });
 
             // Find and open the marker popup
-            const marker = markers.find(m => {
-                const lngLat = m.getLngLat();
-                return Math.abs(lngLat.lat - lat) < 0.0001 && 
-                       Math.abs(lngLat.lng - lon) < 0.0001;
-            });
-            
-            if (marker) {
-                marker.togglePopup();
-            }
+            setTimeout(() => {
+                const marker = markers.find(m => {
+                    const lngLat = m.getLngLat();
+                    return Math.abs(lngLat.lat - lat) < 0.0001 && 
+                           Math.abs(lngLat.lng - lon) < 0.0001;
+                });
+                
+                if (marker) {
+                    marker.togglePopup();
+                }
+            }, 2100);
         }
     };
 
@@ -324,16 +335,17 @@
                             <span class="material-icons-round">close</span>
                         </button>
                     </div>
-                    <div style="padding: 20px; max-height: calc(90vh - 150px); overflow: auto; display: flex; justify-content: center;">
-                        <img id="modal-alert-image" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);" />
+                    <div style="padding: 20px; max-height: calc(90vh - 200px); overflow: auto; display: flex; justify-content: center; align-items: center;">
+                        <img id="modal-alert-image" style="max-width: 100%; max-height: 70vh; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);" />
                     </div>
-                    <div style="padding: 16px; background: #f5f5f5; display: flex; justify-content: flex-end; gap: 8px;">
-                        <button onclick="downloadAlertImage()" style="background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 14px;" onmouseover="this.style.background='#45a049'" onmouseout="this.style.background='#4CAF50'">
-                            <span class="material-icons-round" style="font-size:18px;">download</span>
+                    <div style="padding: 16px; background: #f5f5f5; display: flex; justify-content: center; align-items: center; gap: 12px;">
+                        <button onclick="downloadAlertImage()" style="background: #4CAF50; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; font-weight: 500; min-width: 160px;" onmouseover="this.style.background='#45a049'" onmouseout="this.style.background='#4CAF50'">
+                            <span class="material-icons-round" style="font-size:20px;">download</span>
                             Download Image
                         </button>
-                        <button onclick="closeImageModal()" style="background: #666; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;" onmouseover="this.style.background='#555'" onmouseout="this.style.background='#666'">
+                        <button onclick="closeImageModal()" style="background: #666; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 500; min-width: 100px;" onmouseover="this.style.background='#555'" onmouseout="this.style.background='#666'">
                             Close
+                        </button>
                         </button>
                     </div>
                 </div>
