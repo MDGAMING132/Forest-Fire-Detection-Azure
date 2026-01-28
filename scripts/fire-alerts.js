@@ -97,7 +97,7 @@
                     " onmouseover="this.style.background='rgba(255,255,255,0.3)'" 
                        onmouseout="this.style.background='rgba(255,255,255,0.2)'">
                         <span class="material-icons-round" style="font-size:16px;">map</span>
-                        View on Map
+                        Map
                     </button>
                     ${(alert.imageData || alert.image) ? `
                     <button onclick="viewAlertImage('${alert.id}')" style="
@@ -116,9 +116,25 @@
                     " onmouseover="this.style.background='rgba(255,255,255,0.3)'" 
                        onmouseout="this.style.background='rgba(255,255,255,0.2)'">
                         <span class="material-icons-round" style="font-size:16px;">photo_camera</span>
-                        View Image
+                        Image
                     </button>
                     ` : ''}
+                    <button onclick="deleteAlert('${alert.id}')" style="
+                        background: rgba(255,255,255,0.15);
+                        border: 1px solid rgba(255,255,255,0.3);
+                        color: white;
+                        padding: 6px 10px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 12px;
+                        display: flex;
+                        align-items: center;
+                        gap: 4px;
+                    " onmouseover="this.style.background='rgba(255,255,255,0.25)'" 
+                       onmouseout="this.style.background='rgba(255,255,255,0.15)'"
+                       title="Delete this alert">
+                        <span class="material-icons-round" style="font-size:16px;">delete</span>
+                    </button>
                 </div>
             </div>
         `;
@@ -364,6 +380,101 @@
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    };
+
+    // Clear all alerts
+    window.clearAllAlerts = async function() {
+        if (!confirm('Are you sure you want to clear all fire alerts?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/fire-alerts', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log(`✅ Cleared ${data.count} alerts`);
+                
+                // Clear local cache and UI
+                alertsCache = [];
+                displayAlerts([]);
+                markers.forEach(marker => marker.remove());
+                markers = [];
+                
+                // Show success message
+                const container = document.getElementById('fire-alerts-container');
+                if (container) {
+                    container.innerHTML = '<div style="padding:8px; color:#4CAF50; font-size:13px; text-align:center;">✓ All alerts cleared</div>';
+                    setTimeout(() => {
+                        container.innerHTML = '<div style="padding:8px; color:#999; font-size:13px; text-align:center;">No active alerts</div>';
+                    }, 2000);
+                }
+            } else {
+                console.error('Failed to clear alerts:', response.statusText);
+                alert('Failed to clear alerts. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error clearing alerts:', error);
+            alert('Error clearing alerts. Please try again.');
+        }
+    };
+
+    // Delete single alert
+    window.deleteAlert = async function(alertId) {
+        if (!confirm('Are you sure you want to delete this alert?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/fire-alert/${alertId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                console.log(`✅ Deleted alert ${alertId}`);
+                
+                // Remove from cache
+                alertsCache = alertsCache.filter(a => a.id !== alertId);
+                
+                // Update display
+                displayAlerts(alertsCache);
+                
+                // Remove marker
+                const alert = alertsCache.find(a => a.id === alertId);
+                if (alert) {
+                    const lat = alert.location?.latitude || alert.location?.lat;
+                    const lon = alert.location?.longitude || alert.location?.lon;
+                    if (lat && lon) {
+                        const markerIndex = markers.findIndex(m => {
+                            const lngLat = m.getLngLat();
+                            return Math.abs(lngLat.lat - lat) < 0.0001 && 
+                                   Math.abs(lngLat.lng - lon) < 0.0001;
+                        });
+                        if (markerIndex !== -1) {
+                            markers[markerIndex].remove();
+                            markers.splice(markerIndex, 1);
+                        }
+                    }
+                }
+                
+                // Refresh to ensure sync
+                setTimeout(() => updateAlerts(), 500);
+            } else {
+                console.error('Failed to delete alert:', response.statusText);
+                alert('Failed to delete alert. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error deleting alert:', error);
+            alert('Error deleting alert. Please try again.');
+        }
     };
 
     // Update alerts

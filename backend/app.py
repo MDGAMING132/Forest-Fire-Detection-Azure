@@ -182,6 +182,26 @@ def get_single_alert(alert_id):
         return jsonify({"error": "Alert not found"}), 404
     return jsonify({"success": True, "alert": alert})
 
+@app.delete("/api/fire-alerts")
+def clear_all_alerts():
+    """Clear all fire alerts"""
+    global fire_alerts
+    count = len(fire_alerts)
+    fire_alerts.clear()
+    print(f"🗑️ Cleared {count} fire alerts")
+    return jsonify({"success": True, "message": f"Cleared {count} alerts", "count": count})
+
+@app.delete("/api/fire-alert/<alert_id>")
+def delete_alert(alert_id):
+    """Delete specific fire alert"""
+    global fire_alerts
+    alert = next((a for a in fire_alerts if a["id"] == alert_id), None)
+    if not alert:
+        return jsonify({"error": "Alert not found"}), 404
+    fire_alerts.remove(alert)
+    print(f"🗑️ Deleted alert {alert_id}")
+    return jsonify({"success": True, "message": "Alert deleted"})
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))

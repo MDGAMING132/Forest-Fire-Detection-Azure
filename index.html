@@ -83,7 +83,13 @@
         <div class="layer-group">
           <div class="group-title" style="display:flex; justify-content:space-between; align-items:center;">
              <span><span class="material-icons-round">camera_outdoor</span> AI Fire Alerts</span>
-             <span id="alert-count" class="badge" style="background:#ff4444; color:white; padding:2px 8px; border-radius:12px; font-size:12px;">0</span>
+             <div style="display:flex; align-items:center; gap:8px;">
+               <span id="alert-count" class="badge" style="background:#ff4444; color:white; padding:2px 8px; border-radius:12px; font-size:12px;">0</span>
+               <button onclick="clearAllAlerts()" style="background:rgba(255,68,68,0.15); border:1px solid rgba(255,68,68,0.3); color:#ff4444; padding:4px 10px; border-radius:4px; cursor:pointer; font-size:11px; display:flex; align-items:center; gap:4px;" onmouseover="this.style.background='rgba(255,68,68,0.25)'" onmouseout="this.style.background='rgba(255,68,68,0.15)'" title="Clear all alerts">
+                 <span class="material-icons-round" style="font-size:14px;">delete_sweep</span>
+                 Clear
+               </button>
+             </div>
           </div>
           <div id="fire-alerts-container" style="max-height:300px; overflow-y:auto;">
             <div style="padding:8px; color:#999; font-size:13px; text-align:center;">No active alerts</div>
