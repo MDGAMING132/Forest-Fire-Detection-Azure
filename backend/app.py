@@ -3,6 +3,7 @@ from flask import Flask, jsonify, send_from_directory, request
 import requests
 from dotenv import load_dotenv
 from flask_cors import CORS
+from datetime import datetime, timedelta
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
@@ -137,10 +138,30 @@ def static_files(filename):
 
 # Fire Alert Storage
 fire_alerts = []
+MAX_ALERTS = 3  # Keep only last 3 alerts
+ALERT_EXPIRY_MINUTES = 5  # Auto-remove alerts after 5 minutes
+
+def clean_old_alerts():
+    """Remove alerts older than 5 minutes"""
+    global fire_alerts
+    now = datetime.now()
+    original_count = len(fire_alerts)
+    
+    fire_alerts = [
+        alert for alert in fire_alerts
+        if (now - datetime.fromisoformat(alert['timestamp'])) < timedelta(minutes=ALERT_EXPIRY_MINUTES)
+    ]
+    
+    removed = original_count - len(fire_alerts)
+    if removed > 0:
+        print(f"🗑️ Auto-removed {removed} expired alerts (older than {ALERT_EXPIRY_MINUTES} minutes)")
 
 @app.post("/api/fire-alert")
 def receive_fire_alert():
     """Receive fire detection from webcam AI"""
+    # Clean old alerts before adding new one
+    clean_old_alerts()
+    
     data = request.get_json()
     if not data:
         return jsonify({"error": "No data provided"}), 400
@@ -155,17 +176,26 @@ def receive_fire_alert():
         "imageData": data.get("image"),
         "receivedAt": data.get("timestamp")
     }
+    
+    # Add to beginning of list
     fire_alerts.insert(0, alert)
-    if len(fire_alerts) > 100:
-        fire_alerts.pop()
+    
+    # Keep only last MAX_ALERTS
+    if len(fire_alerts) > MAX_ALERTS:
+        removed = fire_alerts[MAX_ALERTS:]
+        fire_alerts = fire_alerts[:MAX_ALERTS]
+        print(f"🗑️ Removed {len(removed)} old alerts (keeping last {MAX_ALERTS})")
     
     print(f"🔥 Fire alert received from {alert['location'].get('city', 'Unknown')}")
     return jsonify({"success": True, "message": "Fire alert received", "alertId": alert["id"]})
 
 @app.get("/api/fire-alerts")
 def get_fire_alerts():
-    """Get all fire alerts"""
-    limit = int(request.args.get("limit", 50))
+    """Get fire alerts (auto-clean old ones)"""
+    # Clean old alerts before returning
+    clean_old_alerts()
+    
+    limit = min(int(request.args.get("limit", MAX_ALERTS)), MAX_ALERTS)  # Max 3 alerts
     include_images = request.args.get("includeImages") == "true"
     
     alerts = fire_alerts[:limit]
