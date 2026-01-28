@@ -227,7 +227,7 @@
                                 <div><strong>Coordinates:</strong> ${lat.toFixed(6)}, ${lon.toFixed(6)}</div>
                                 ${alert.location.altitude ? `<div><strong>Altitude:</strong> ${alert.location.altitude.toFixed(1)}m</div>` : ''}
                                 ${alert.device ? `<div><strong>Device:</strong> ${alert.device}</div>` : ''}
-                                ${(alert.imageData || alert.image) ? `<img src="data:image/jpeg;base64,${alert.imageData || alert.image}" style="width:100%; margin-top:8px; border-radius:4px;" onerror="this.style.display='none'" />` : ''}
+                                ${(alert.imageData || alert.image) ? `<img src="${(alert.imageData || alert.image).startsWith('data:') ? (alert.imageData || alert.image) : 'data:image/jpeg;base64,' + (alert.imageData || alert.image)}" style="width:100%; margin-top:8px; border-radius:4px;" onerror="this.style.display='none'" />` : ''}
                             </div>
                         </div>
                     `))
@@ -343,7 +343,9 @@
         const img = document.getElementById('modal-alert-image');
         const info = document.getElementById('modal-alert-info');
         
-        img.src = `data:image/jpeg;base64,${imageData}`;
+        // Handle base64 image data with or without prefix
+        const imgSrc = imageData.startsWith('data:') ? imageData : `data:image/jpeg;base64,${imageData}`;
+        img.src = imgSrc;
         
         const locationText = alert.location ? 
             `${alert.location.city || ''}, ${alert.location.state || ''}, ${alert.location.country || ''}`.replace(/^,\s*|,\s*$/g, '').replace(/,\s*,/g, ',') :
@@ -374,8 +376,9 @@
         
         const alert = window.currentAlertImage;
         const imageData = alert.imageData || alert.image;
+        const imgSrc = imageData.startsWith('data:') ? imageData : `data:image/jpeg;base64,${imageData}`;
         const link = document.createElement('a');
-        link.href = `data:image/jpeg;base64,${imageData}`;
+        link.href = imgSrc;
         link.download = `fire_alert_${alert.id}_${new Date(alert.timestamp).getTime()}.jpg`;
         document.body.appendChild(link);
         link.click();
