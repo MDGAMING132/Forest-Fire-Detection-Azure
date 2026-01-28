@@ -218,15 +218,15 @@
                 .setLngLat([lon, lat])
                 .setPopup(new maplibregl.Popup({offset: 25})
                     .setHTML(`
-                        <div style="padding:8px;">
+                        <div style="padding:8px; background:white; color:#333;">
                             <strong style="color:${isDrone ? '#ff6600' : '#ff4444'};">${isDrone ? '🚁' : '🔥'} ${isDrone ? 'Drone' : 'AI'} Fire Detection Alert</strong>
-                            <div style="margin-top:8px; font-size:13px;">
-                                <div><strong>Time:</strong> ${new Date(alert.timestamp).toLocaleString()}</div>
-                                ${alert.confidence ? `<div><strong>Confidence:</strong> ${(alert.confidence * 100).toFixed(1)}%</div>` : ''}
-                                ${alert.location.city ? `<div><strong>Location:</strong> ${alert.location.city}${alert.location.state ? ', ' + alert.location.state : ''}</div>` : ''}
-                                <div><strong>Coordinates:</strong> ${lat.toFixed(6)}, ${lon.toFixed(6)}</div>
-                                ${alert.location.altitude ? `<div><strong>Altitude:</strong> ${alert.location.altitude.toFixed(1)}m</div>` : ''}
-                                ${alert.device ? `<div><strong>Device:</strong> ${alert.device}</div>` : ''}
+                            <div style="margin-top:8px; font-size:13px; color:#333;">
+                                <div style="color:#333;"><strong>Time:</strong> ${new Date(alert.timestamp).toLocaleString()}</div>
+                                ${alert.confidence ? `<div style="color:#333;"><strong>Confidence:</strong> ${(alert.confidence * 100).toFixed(1)}%</div>` : ''}
+                                ${alert.location.city ? `<div style="color:#333;"><strong>Location:</strong> ${alert.location.city}${alert.location.state ? ', ' + alert.location.state : ''}</div>` : ''}
+                                <div style="color:#333;"><strong>Coordinates:</strong> ${lat.toFixed(6)}, ${lon.toFixed(6)}</div>
+                                ${alert.location.altitude ? `<div style="color:#333;"><strong>Altitude:</strong> ${alert.location.altitude.toFixed(1)}m</div>` : ''}
+                                ${alert.device ? `<div style="color:#333;"><strong>Device:</strong> ${alert.device}</div>` : ''}
                                 ${(alert.imageData || alert.image) ? `<img src="${(alert.imageData || alert.image).startsWith('data:') ? (alert.imageData || alert.image) : 'data:image/jpeg;base64,' + (alert.imageData || alert.image)}" style="width:100%; margin-top:8px; border-radius:4px;" onerror="this.style.display='none'" />` : ''}
                             </div>
                         </div>
@@ -268,11 +268,27 @@
     };
 
     // View alert image in modal
-    window.viewAlertImage = function(alertId) {
-        const alert = alertsCache.find(a => a.id === alertId);
-        const imageData = alert?.imageData || alert?.image;
-        if (!alert || !imageData) {
+    window.viewAlertImage = async function(alertId) {
+        let alert = alertsCache.find(a => a.id === alertId);
+        let imageData = alert?.imageData || alert?.image;
+        
+        // If no image data, fetch full alert from server
+        if (!alert || !imageData || imageData === 'available') {
+            try {
+                const response = await fetch(`/api/fire-alert/${alertId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    alert = data.alert;
+                    imageData = alert?.imageData || alert?.image;
+                }
+            } catch (error) {
+                console.error('Error fetching alert:', error);
+            }
+        }
+        
+        if (!alert || !imageData || imageData === 'available') {
             console.error('Alert image not found:', alertId);
+            alert('Image not available for this alert.');
             return;
         }
 
